@@ -268,48 +268,6 @@ Statement *test = new Seq({
 						  )
 });
 
-Statement *test1 = new Seq({
-						new Assignment(
-								"x",
-								new Add(
-										new Variable("x"),
-										new Constant(1)
-								)
-						),
-						new Assignment(
-								"y",
-								new Add(
-										new Variable("y"),
-										new Constant(1)
-								)
-						),
-						new If(
-								new Equality(
-									new Variable("x"),
-									new Constant(0)
-								),
-								new If(
-										new Equality(
-											new Variable("y"),
-											new Constant(0)
-										),
-										new Assignment(
-											"x",
-											new Constant(1)
-										),
-										new Assignment(
-											"y",
-											new Constant(2)
-										)
-								),
-								new Assignment(
-											"y",
-											new Constant(3)
-										)
-								)							
-});
-
-
 int main() {
 	BBlock *block = new BBlock();
 	test->convert(block);
@@ -318,7 +276,6 @@ int main() {
 	UTILS::dumpHybrid(block);
 
 	delete test;
-	delete test1;
 	delete block;
 
 	return 0;
