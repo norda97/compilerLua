@@ -8,8 +8,14 @@
 
 #define INLINE_ADDQ(lhs, rhs) "addq \%" << lhs << ",\t\%" << rhs
 #define INLINE_MULQ(lhs) "mulq \%" << lhs
+#define INLINE_DIVQ(lhs) "divq \%" << lhs
+
+#define INLINE_XORQ(lhs, rhs) "xorq \%" << lhs << ",\t\%" << rhs
 
 /* --------------Single Precision Double Operations---------------- */
+#define INLINE_INT_TO_DBL(lhs, rhs) "cvtsi2sdq \%" << lhs << ",\t\%" << rhs
+#define INLINE_DBL_TO_INT(lhs, rhs) "cvttsd2siq \%" << lhs << ",\t\%" << rhs
+
 #define INLINE_MOVSD(lhs, rhs) "movsd \%" << lhs << ",\t\%" << rhs
 
 #define INLINE_ADDSD(lhs, rhs) "addsd \%" << lhs << ",\t\%" << rhs
@@ -60,7 +66,7 @@ void ThreeAd::expand(std::ofstream& mfile)
 		else if (op == "LENGTH")
 			this->expandLength(mfile);
 		else if (op == "*" || op == "+" || op == "-" || op == "/"
-				|| op == "<" || op == "<=" || op == ">" || op == "/" )
+				|| op == "<" || op == "<=" || op == ">")
 			this->expandBinop(mfile);
 		else if (op == "%")
 			this->expandMod(mfile);
@@ -93,7 +99,35 @@ void ThreeAd::expandFunc(std::ofstream& mfile)
 void ThreeAd::expandBinop(std::ofstream& mfile) 
 {
 	this->updateParameters();
-	mfile << this->name << " = " << this->lhs << this->op << this->rhs << ";\n";
+	if ( op == "<" || op == "<=" || op == ">")
+		mfile << this->name << " = " << this->lhs << this->op << this->rhs << ";\n";
+	else {
+		mfile << "asm(\n";
+		INLINE_LINE(mfile, INLINE_MOVSD(INLINE_READ("lhs"), "\%xmm0"));
+		INLINE_LINE(mfile, INLINE_MOVSD(INLINE_READ("rhs"), "\%xmm1"));
+
+		if ( this->op  == "+")
+			INLINE_LINE(mfile, INLINE_ADDSD("\%xmm1", "\%xmm0"));
+		else if ( this->op  == "-")
+			INLINE_LINE(mfile, INLINE_SUBSD("\%xmm1", "\%xmm0"));
+		else if ( this->op  == "/")
+			INLINE_LINE(mfile, INLINE_DIVSD("\%xmm1", "\%xmm0"));
+		else if ( this->op  == "*")
+			INLINE_LINE(mfile, INLINE_MULSD("\%xmm1", "\%xmm0"));
+
+		INLINE_LINE(mfile, INLINE_MOVSD("\%xmm0", INLINE_READ(this->name)));
+
+		mfile << ":";
+		INLINE_INPUT(mfile, INLINE_READ(this->name), "=x", this->name);
+		mfile << ":";
+		INLINE_OUTPUT(mfile, INLINE_READ("lhs"), "x", this->lhs);
+		INLINE_OUTPUT_LAST(mfile, INLINE_READ("rhs"), "x", this->rhs);
+		mfile << ":\t";
+		INLINE_TOUCHED(mfile, "xmm0");
+		INLINE_TOUCHED(mfile, "xmm1");
+		INLINE_TOUCHED_LAST(mfile, "cc");
+		mfile << "\n);\n";
+	}
 }
 
 void ThreeAd::expandTable(std::ofstream& mfile) 
@@ -119,7 +153,29 @@ void ThreeAd::expandLength(std::ofstream& mfile)
 void ThreeAd::expandMod(std::ofstream& mfile) 
 {
 	this->updateParameters();
-	mfile << this->name << " = (int)" << this->lhs << this->op << " (int)" << this->rhs << ";\n";
+	//mfile << this->name << " = (int)" << this->lhs << this->op << " (int)" << this->rhs << ";\n";
+
+	mfile << "asm(\n";
+	// Convert doubles to integers
+	INLINE_LINE(mfile, INLINE_DBL_TO_INT(INLINE_READ("lhs"), "\%rax")); // Set bot 64 bits to täljare
+	INLINE_LINE(mfile, INLINE_DBL_TO_INT(INLINE_READ("rhs"), "\%rbx")); // Set rbx to  divisor
+	// Continue with modulo operation
+	INLINE_LINE(mfile, INLINE_XORQ("\%rdx", "\%rdx")); // Zero top 64 bits 
+	INLINE_LINE(mfile, INLINE_DIVQ("\%rbx"));
+	INLINE_LINE(mfile, INLINE_INT_TO_DBL("\%rdx", INLINE_READ("remainder"))); // Return remainder
+
+	// Set up
+	mfile << ":";
+	INLINE_INPUT(mfile, INLINE_READ("remainder"), "=x", this->name);
+	mfile << ":";
+	INLINE_OUTPUT(mfile, INLINE_READ("lhs"), "x", this->lhs);
+	INLINE_OUTPUT_LAST(mfile, INLINE_READ("rhs"), "x", this->rhs);
+	mfile << ":\t";
+	INLINE_TOUCHED(mfile, "rax");
+	INLINE_TOUCHED(mfile, "rbx");
+	INLINE_TOUCHED(mfile, "rdx");
+	INLINE_TOUCHED_LAST(mfile, "cc");
+	mfile << "\n);\n";
 }
 
 void ThreeAd::expandPow(std::ofstream& mfile) 
@@ -131,7 +187,20 @@ void ThreeAd::expandPow(std::ofstream& mfile)
 void ThreeAd::expandAssign(std::ofstream& mfile) 
 {
 	this->updateParameters();
-	mfile << this->name << " = " << this->lhs << ";\n";
+	//mfile << this->name << " = " << this->lhs << ";\n";
+
+	mfile << "asm(\n";
+	INLINE_LINE(mfile, INLINE_MOVSD(INLINE_READ("lhs"), "\%xmm0"));
+	INLINE_LINE(mfile, INLINE_MOVSD("\%xmm0", INLINE_READ("rhs")));
+
+	mfile << ":";
+	INLINE_INPUT(mfile, INLINE_READ("rhs"), "=x", this->name);
+	mfile << ":";
+	INLINE_OUTPUT_LAST(mfile, INLINE_READ("lhs"), "x", this->lhs);
+	mfile << ":\t";
+	INLINE_TOUCHED(mfile, "xmm0");
+	INLINE_TOUCHED_LAST(mfile, "cc");
+	mfile << "\n);\n";
 }
 
 void ThreeAd::expandFuncCall(std::ofstream& mfile) 
