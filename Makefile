@@ -10,7 +10,7 @@ lex.yy.c: binary.ll binary.tab.cc
 run: target.exe
 	./target
 target.exe: target.cc
-	g++ -std=gnu++11 -g -o target target.cc
+	gcc -g -o target target.cc
 tar: Utils.* ThreeAdd.* BasicBlock.* Node.* main.cpp labTrees.cc binary.* Makefile
 	tar czf submission.tgz --transform 's,^,ass2-comp/,' Utils.* ThreeAdd.* BasicBlock.* Node.* main.cpp labTrees.cc binary.* Makefile
 clean: 

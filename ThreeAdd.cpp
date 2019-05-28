@@ -5,10 +5,14 @@
 
 /* -----------------------Quad operations ------------------------- */
 #define INLINE_MOVQ(lhs, rhs) "movq \%" << lhs << ",\t\%" << rhs
+#define INLINE_MOVQ_IMM(lhs, rhs) "movq " << lhs << ",\t" << rhs
 
 #define INLINE_ADDQ(lhs, rhs) "addq \%" << lhs << ",\t\%" << rhs
 #define INLINE_MULQ(lhs) "mulq \%" << lhs
 #define INLINE_DIVQ(lhs) "divq \%" << lhs
+
+#define INLINE_PUSHQ(lhs) "pushq \%" << lhs
+#define INLINE_POPQ(lhs) "popq \%" << lhs
 
 #define INLINE_XORQ(lhs, rhs) "xorq \%" << lhs << ",\t\%" << rhs
 
@@ -24,9 +28,12 @@
 #define INLINE_SUBSD(lhs, rhs) "subsd \%" << lhs << ",\t\%" << rhs
 
 /* -------------------------I/O operations------------------------- */
+#define INLINE_CALL(lhs) "call " << lhs
 
 /* ----------------------Inline Operations------------------------- */
 #define INLINE_READ(str) "[" << str << "]"
+
+#define INLINE_STRING(str) '"' << str << '"'
 
 #define INLINE_INPUT(mfile, lhs, op, rhs) mfile << '\t' << lhs << " \"" << op << "\" (" << rhs << ')' << '\n'
 #define INLINE_OUTPUT(mfile, lhs, op, rhs) mfile << '\t' << lhs << "\t \"" << op << "\" (" << rhs << ')' << ",\n"
@@ -218,21 +225,110 @@ void ThreeAd::expandFuncCall(std::ofstream& mfile)
 	}
 
 	if ( this->lhs == "print") {
-		mfile << "printf(\""<< type << "\\n\"," << this->rhs << ");";
+		this->expandPrint(mfile);
 	}
 	else if ( this->lhs == "read")  {
-		if (this->rhs == "\"*number\"")
-			mfile << "scanf(\""<< "%lf" << "\",&" << this->name << ");";
-		else if (this->rhs == "\"*line\"")
-			mfile << "scanf(\""<< "%s" << "\\n\",&" << this->name << ");";
+		this->expandScanf(mfile);
 	}
 	else if ( this->lhs == "write")  {
-		mfile << "printf(\""<< type << "\"," << this->rhs << ");";
+		this->expandWrite(mfile);
 	}
 	else {
 		mfile << this->lhs << "(" <<  this->rhs << ");\n";
 		mfile << this->name << " = " << _RETURN << ";";
 	}
+}
+
+void ThreeAd::expandPrint(std::ofstream& mfile) 
+{
+	this->updateParameters();
+	mfile << "asm(\n";
+	switch (this->rhsType) {
+		case Type::STR:
+				INLINE_LINE(mfile, INLINE_MOVQ(INLINE_READ("arg1"), "\%rdi"));
+				INLINE_LINE(mfile, INLINE_MOVQ(INLINE_READ("arg2"), "\%rsi"));
+				INLINE_LINE(mfile, INLINE_MOVQ_IMM("$0", "\%\%rax"));
+
+				INLINE_LINE(mfile, INLINE_PUSHQ("%r10"));
+				INLINE_LINE(mfile, INLINE_PUSHQ("%r11"));
+
+				INLINE_LINE(mfile, INLINE_CALL("printf"));
+				
+				INLINE_LINE(mfile, INLINE_POPQ("%r11"));
+				INLINE_LINE(mfile, INLINE_POPQ("%r10"));
+
+				mfile << ":";
+				mfile << ":";
+				INLINE_OUTPUT_LAST(mfile, INLINE_READ("arg1"), "g", INLINE_STRING("%s"));
+				INLINE_OUTPUT_LAST(mfile, INLINE_READ("arg2"), "g", INLINE_STRING(this->rhs));
+				mfile << ":\t";
+				INLINE_TOUCHED(mfile, "rax");
+				INLINE_TOUCHED(mfile, "rdi");
+				INLINE_TOUCHED(mfile, "rsi");
+				INLINE_TOUCHED(mfile, "rdx");
+				INLINE_TOUCHED(mfile, "rcx");
+				INLINE_TOUCHED(mfile, "rbx");
+				INLINE_TOUCHED_LAST(mfile, "cc");
+			break;
+		default:
+				INLINE_LINE(mfile, INLINE_MOVQ(INLINE_READ("arg1"), "\%rdi"));
+				INLINE_LINE(mfile, INLINE_MOVSD(INLINE_READ("arg2"), "\%xmm0"));
+				INLINE_LINE(mfile, INLINE_MOVQ_IMM("$1", "\%rax"));
+
+				INLINE_LINE(mfile, INLINE_PUSHQ("%r10"));
+				INLINE_LINE(mfile, INLINE_PUSHQ("%r11"));
+
+				INLINE_LINE(mfile, INLINE_CALL("printf"));
+				
+				INLINE_LINE(mfile, INLINE_POPQ("%r11"));
+				INLINE_LINE(mfile, INLINE_POPQ("%r10"));
+
+				mfile << ":\n";
+				mfile << ":";
+				INLINE_OUTPUT(mfile, INLINE_READ("arg1"), "g",  INLINE_STRING("%.1f"));
+				INLINE_OUTPUT_LAST(mfile, INLINE_READ("arg2"), "x", this->rhs);
+				mfile << ":\t";
+				INLINE_TOUCHED(mfile, "rax");
+				INLINE_TOUCHED(mfile, "rdi");
+				INLINE_TOUCHED(mfile, "rsi");
+				INLINE_TOUCHED(mfile, "rdx");
+				INLINE_TOUCHED(mfile, "rcx");
+				INLINE_TOUCHED(mfile, "rbx");
+				INLINE_TOUCHED(mfile, "xmm0");
+				INLINE_TOUCHED_LAST(mfile, "cc");
+			break;
+	}
+	mfile << "\n);\n";
+
+
+	//mfile << "printf(\""<< type << "\\n\"," << this->rhs << ");";
+}
+
+void ThreeAd::expandWrite(std::ofstream& mfile) 
+{
+	std::string type;
+	this->updateParameters();
+
+	switch (this->rhsType) {
+		case Type::STR:
+				type = "%s";
+			break;
+		default:
+				type = "%.1f";
+			break;
+	}
+
+	mfile << "printf(\""<< type << "\"," << this->rhs << ");";
+}
+void ThreeAd::expandScanf(std::ofstream& mfile) 
+{
+	std::string type;
+	this->updateParameters();
+
+	if (this->rhs == "\"*number\"")
+		mfile << "scanf(\""<< "%lf" << "\",&" << this->name << ");";
+	else if (this->rhs == "\"*line\"")
+		mfile << "scanf(\""<< "%s" << "\\n\",&" << this->name << ");";
 }
 
 void ThreeAd::expandIf(std::ofstream& mfile) 
