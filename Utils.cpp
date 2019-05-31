@@ -21,7 +21,7 @@ namespace UTILS {
 		BBlock* mainBlock =  cfgs->front();
 		cfgs->pop_front();
 
-		std::ofstream mfile("target.cc");
+		std::ofstream mfile("target.c");
 		if (mfile.is_open()) {
 			mfile << "#include<stdio.h>\n";
 			mfile << "#include<math.h>\n";
@@ -132,6 +132,7 @@ namespace UTILS {
 					case Type::VAR:
 						doubleDeclartions += sep1 + symbolName + "=0";
 						sep1 = separator;
+						doubleExists = true;
 						break;
 					case Type::DBL_PTR:
 						doublePtrDeclartions += sep2 + "*" + symbolName + "=NULL";
@@ -139,7 +140,7 @@ namespace UTILS {
 						doublePtrExists = true;
 						break;
 					case Type::TBL:
-						std::string size = std::to_string(std::stoi(it.second.rhs));
+						std::string size = std::to_string(std::stoi(it.second.rhs)+1); // add one because first spot will store length of table
 						tableDeclartions += "double " + symbolName + '[' + size + "];\n";
 						tableExists =  true;
 						break;

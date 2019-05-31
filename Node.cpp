@@ -180,7 +180,7 @@ Statement* Node::evalStatement(std::map<std::string, Statement*>& procedures) {
 				String* tableName = new String(var->value);
 				Table* table = new Table(tableName, new Constant(arg.children.size()));
 				
-				int i = 0;
+				int i = 1;
 				for (auto field : arg.children)
 					table->addField(new Store(tableName,
 						new Constant(i++),

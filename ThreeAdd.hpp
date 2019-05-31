@@ -38,8 +38,7 @@ private:
     void expandMod(std::ofstream& mfile);
     void expandPow(std::ofstream& mfile);
 
-    void expandPrint(std::ofstream& mfile);
-    void expandWrite(std::ofstream& mfile);
+    void expandPrint(std::ofstream& mfile, bool write = false);
     void expandScanf(std::ofstream& mfile);
 
     void expandLength(std::ofstream& mfile);
