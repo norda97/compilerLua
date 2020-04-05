@@ -9,8 +9,8 @@ lex.yy.c: binary.ll binary.tab.cc
 		flex binary.ll
 run: target.exe
 	./target
-target.exe: target.c
-	gcc -no-pie -g -o target target.c -lm
+target.exe: target.s
+	gcc -no-pie -o target target.s -lm
 tar: Utils.* ThreeAdd.* BasicBlock.* Node.* main.cpp labTrees.cc binary.* Makefile
 	tar czf submission.tgz --transform 's,^,ass2-comp/,' Utils.* ThreeAdd.* BasicBlock.* Node.* main.cpp labTrees.cc binary.* Makefile
 clean: 

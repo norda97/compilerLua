@@ -1,8 +1,5 @@
-function f(a)
-	print(a);
-	if a < 10 then
-		f(a+1)
-	end
+function f(n)
+	return n+n
 end
 
-f(2)
+print(f(2))

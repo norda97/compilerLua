@@ -33,7 +33,7 @@ public:
 		virtual ~Expression() {};
 		std::pair<Type, std::string> makeNames(){
 			this->name = "_t" + std::to_string(nCounter++);
-			return std::make_pair(Type::DBL, this->name);
+			return std::make_pair(Type::VAR, this->name);
 		}
 		virtual std::pair<Type, std::string> convert(BBlock*) = 0; // Lecture 8 / slide 12.
 };
@@ -70,7 +70,13 @@ public:
 		std::pair<Type, std::string> convert(BBlock* out)
 		{
 				// Write three address instructions into the block
-				return std::make_pair(Type::STR, value);
+
+				auto unique = this->makeNames();
+				CHANGE_PAIR_TYPE(unique, Type::STR);
+				auto pairValue = std::make_pair(Type::STR, value);
+				ADD_INSTRUCTION(out, unique, "STR", pairValue, pairValue);
+
+				return unique;
 		}
 };
 
@@ -79,11 +85,16 @@ class Constant : public Expression
 public:
 		double value;
 
-		Constant(double value) : value(value) { this->name =  std::to_string(value); }
+		Constant(double value) : value(value) {}
 
 		std::pair<Type, std::string> convert(BBlock* out)
 		{
-			return std::make_pair(Type::DBL, std::to_string(value));
+			auto unique = this->makeNames();
+			CHANGE_PAIR_TYPE(unique, Type::DBL);
+			auto pairValue = std::make_pair(Type::DBL,  std::to_string(value));
+			ADD_INSTRUCTION(out, unique, "DBL", pairValue, pairValue);
+
+			return unique;
 		}
 };
 
@@ -126,7 +137,6 @@ public:
 		{
 			// // Write three address instructions into the block
 			auto unique = this->makeNames();
-			CHANGE_PAIR_TYPE(unique, Type::DBL_PTR);
 			auto lhsPair = table->convert(out);
 			auto rhsPair = index->convert(out);
 			ADD_INSTRUCTION(out, unique, "LOAD", lhsPair, rhsPair);
@@ -179,6 +189,37 @@ public:
 			ADD_INSTRUCTION(out, unique, "LENGTH", lhsPair, lhsPair);
 
 			return unique;
+		}
+};
+
+
+class TblName : public Expression
+{
+public:
+		std::string value;
+
+		TblName(const std::string& value) :
+				value(value)
+		{
+			this->name = value;
+		}
+
+		std::pair<Type, std::string> convert(BBlock* out)
+		{
+				return std::make_pair(Type::STR, value);
+		}
+};
+
+class TblIndex : public Expression
+{
+public:
+		int value;
+
+		TblIndex(int value) : value(value) {}
+
+		std::pair<Type, std::string> convert(BBlock* out)
+		{
+			return std::make_pair(Type::DBL,  std::to_string(value));
 		}
 };
 
@@ -278,7 +319,7 @@ public:
 			// Write three address instructions into the block
 			auto rhsPair = rhs->convert(out);
 
-			ADD_INSTRUCTION(out, std::make_pair(Type::RET, _RETURN), "ASSIGN", rhsPair, rhsPair);
+			ADD_INSTRUCTION(out, std::make_pair(Type::DBL, _RETURN), "ASSIGN", rhsPair, rhsPair);
 
 			return out;
 		}
@@ -396,10 +437,12 @@ public:
 			auto fnamePair = fname->convert(out);
 			CHANGE_PAIR_TYPE(fnamePair, Type::FNC);
 			auto argPair = std::make_pair(Type::NIL, (std::string)"nil");
-			if(arg)
+			auto regPair = std::make_pair(Type::REG, (std::string)"%xmm0");
+			if(arg) 
  				argPair = arg->convert(out);
 
 			ADD_INSTRUCTION(out, fnamePair, "FUNC", argPair, argPair);			
+			ADD_INSTRUCTION(out, argPair, "ASSIGN", regPair, regPair);			
 			return body->convert(out);
 		}
 };
