@@ -14,7 +14,7 @@ Supported syntax:
 To use the compiler clone project:
 1. Write LUA code for compilation in Testcases/exeriment.lua
 2. Type in Linux terminal: "Make comp" - Compiles compiler
-3. Execute compiler: "./comp <lua file>" creates target.s assebly file of compiled LUA code
+3. Execute compiler: "./comp "<lua file>" creates target.s assebly file of compiled LUA code
 4. Make run to compile target.s with gcc 
 5. Compiled executable should now exist called a
 6. Execute compilations by typing "./a" 
