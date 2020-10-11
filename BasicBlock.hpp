@@ -23,7 +23,7 @@ public:
 
 		void dumpGraph(std::ofstream& mfile);
 		void walkHybrid(std::ofstream& mfile);
-		void walkSymbolTable(std::set<BBlock*>* visited, std::map<std::string, ThreeAd>* symbolTable);
+		void walkSymbolTable(std::set<BBlock*>* visited, std::list<ThreeAd>* symbolTable, std::set<std::string>* globalSymbolTable);
 };
 
 

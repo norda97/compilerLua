@@ -14,7 +14,7 @@ namespace UTILS {
 
 	void dumpHybrid(std::list<BBlock*> * cfgs);
 
-	void createSymbolTable(BBlock* start, std::ofstream& mfile);
+	void createSymbolTable(BBlock* start, std::set<std::string>* symbolTable, std::ofstream& mfile);
 
 	void dumpAST(Node& root);
 }

@@ -4,7 +4,6 @@
 
 /* Basic Blocks */
 int BBlock::nCounter = 0;
-
 BBlock::BBlock() : tExit(NULL), fExit(NULL), name("block" + std::to_string(nCounter++)) {}
 
 void BBlock::dump()
@@ -35,27 +34,40 @@ void BBlock::walkHybrid(std::ofstream& mfile)
 	
 		if (isIfStatement) {
 			//Comment
-			mfile << "// Block: ";
+			mfile << "# Block: ";
 			it->expandIf(mfile);
 			mfile << this->fExit->name;
 			mfile << " / ";
 			mfile << this->tExit->name << " otherwise";
 			mfile << '\n';
+			
+			std::string asm_cmp_inst = "";
+			if (it->op == "==")
+				asm_cmp_inst = "je";
+			if (it->op == "<=")
+				asm_cmp_inst = "jbe";
+			if (it->op == ">=")
+				asm_cmp_inst = "jae";
+			else if (it->op == ">")
+				asm_cmp_inst = "ja";
+			else if (it->op == "<")
+				asm_cmp_inst = "jb";
 
-			// If statment
-			mfile << "if(";
-			mfile << it->lhs << ' ' << it->op << ' ' << it->rhs;
-			mfile << ") goto " << this->tExit->name;
-			mfile << "; else goto " << this->fExit->name;
-			mfile << ";\n";
+			INST_TWO_ARG(mfile, "movsd", it->rhs, "%xmm0");
+			INST_TWO_ARG(mfile, "movsd", it->lhs, "%xmm1");
+			INST_TWO_ARG(mfile, "ucomisd", "%xmm0", "%xmm1");
+			INST_ONE_ARG(mfile, asm_cmp_inst, this->tExit->name);
+			INST_ONE_ARG(mfile, "jmp", this->fExit->name);
 		}
 		else if (this->tExit)
-			mfile << "goto " << this->tExit->name << ";\n\n";
+			mfile << "jmp " << this->tExit->name << ";\n\n";
 
-		if (tExit == nullptr && fExit  == nullptr) {
-			mfile << "return 0;\n";
+		if (!this->tExit && !this->fExit) {
+			// Return 0 for success
+			mfile << "\tmovq $0, %rax\n";
+			mfile << "\tret\n";
 		}
-		
+			
 }
 
 /* Used to dump graphviz graph */
@@ -116,7 +128,7 @@ void BBlock::dumpGraph(std::ofstream& mfile) {
 		}
 }
 
-void BBlock::walkSymbolTable(std::set<BBlock*>* visited, std::map<std::string, ThreeAd>* symbolTable) {
+void BBlock::walkSymbolTable(std::set<BBlock*>* visited, std::list<ThreeAd>* symbolTable, std::set<std::string>* globalSymbolTable) {
 
 		// Check if block already visited
 		for(auto it : *visited)
@@ -128,24 +140,29 @@ void BBlock::walkSymbolTable(std::set<BBlock*>* visited, std::map<std::string, T
 		// Loop through instructions and try to find new symbols
 		for(auto it : this->instructions) {
 			// Only insert if pair is of types specified below
-			if (symbolTable->find(it.name) == symbolTable->end()
+			if (globalSymbolTable->find(it.name) == globalSymbolTable->end()
 			&& (
 				it.nameType == Type::DBL
 			||	it.nameType == Type::VAR
 			||	it.nameType == Type::RET
-			||	it.nameType == Type::DBL_PTR
+			||	it.nameType == Type::STR
 			||	it.nameType == Type::TBL)
 			) 
 			{
-				symbolTable->insert(std::make_pair(it.name, it));
+				globalSymbolTable->insert(it.name);
+				symbolTable->push_back(it);
+
+				//Add all variable occurnces to push list
+				if (it.nameType == Type::VAR)
+						ThreeAd::PreservedVariables.push_front(it.name);
 			}
 		}
 
 		if (tExit) {
-			tExit->walkSymbolTable(visited, symbolTable);
+			tExit->walkSymbolTable(visited, symbolTable, globalSymbolTable);
 		}
 		if (fExit) {
-			fExit->walkSymbolTable(visited, symbolTable);
+			fExit->walkSymbolTable(visited, symbolTable, globalSymbolTable);
 		}
 }
 

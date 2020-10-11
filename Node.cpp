@@ -172,15 +172,15 @@ Statement* Node::evalStatement(std::map<std::string, Statement*>& procedures) {
 
 		int tempValues = 0;
 		std::string temp;
-		// Iterate through variables if we find a table assignment
+		// Iterate through variables and create temporary storages
 		auto var = front.children.begin();
 		for (auto arg : back.children) {
 			// Create temporary value to hold 
 			if (arg.tag == "fieldlist") {
-				String* tableName = new String(var->value);
-				Table* table = new Table(tableName, new Constant(arg.children.size()));
+				TblName* tableName = new TblName(var->value);
+				Table* table = new Table(tableName, new TblIndex(arg.children.size()));
 				
-				int i = 0;
+				int i = 1;
 				for (auto field : arg.children)
 					table->addField(new Store(tableName,
 						new Constant(i++),
@@ -195,14 +195,22 @@ Statement* Node::evalStatement(std::map<std::string, Statement*>& procedures) {
 			var++;
 		}
 
-		// Iterate through variables if we find a table assignment
+		// Add temp variables to variables
 		auto arg = back.children.begin();
 		int assigned = 0;
 		for (auto var : front.children) {
 			if (arg->tag != "fieldlist") {
 				// Assign variables with temporary values
 				temp = "temp" + std::to_string(assigned++);
-				eq->addAssignment(new Assignment(var.evalExpression(), new Variable(temp)));
+				
+				// Special case if indexing is used then we store instead
+				if (var.tag != "indexing")
+					eq->addAssignment(new Assignment(var.evalExpression(), new Variable(temp)));
+				else {
+					auto list = var.children.front();
+					auto index = var.children.back();
+					eq->addAssignment(new Store(list.evalExpression(), index.evalExpression(), new Variable(temp)));
+				}
 			}
 			arg++;
 		}
